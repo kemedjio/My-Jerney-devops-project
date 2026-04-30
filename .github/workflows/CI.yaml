@@ -64,7 +64,7 @@ jobs:
       matrix:
         component: [backend, frontend]
     outputs:
-      image_tag: ${{ }}
+      image_tag: ${{ steps.meta.outputs.version }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -91,7 +91,125 @@ jobs:
           context: ./${{ matrix.component }}
           file: ./${{ matrix.component }}/Dockerfile
           push: ${{ github.event_name != 'pull_request' }}
-          tags: 
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: true
+          sbom: true
+  image-scan:
+    name: "Scan ${{ matrix.component }} image"
+    runs-on: ubuntu-latest
+    needs: Build
+    strategy:
+      matrix:
+        component: [backend, frontend]
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      - name: Build image for scanning
+        run: |
+          docker build -t jerney-${{ matrix.component }}:scan ./${{ matrix.component }}
+      - name: Run Trivy Scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: "jerney-${{ matrix.component }}:scan"
+          format: "table"
+          exit-code: "1"
+          ignore-unfixed: true
+          vuln-type: "os,library"
+          severity: "CRITICAL,HIGH"
+          timeout: "10m"
+  
+  iac-scan:
+    name: "Scan iac infrastructure."
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      - name: Run Checkov on Terraform
+        uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: terraform/
+          framework: terraform
+          soft-fail: false
+          skip-check: CKV_AWS_39,CKV_AWS_58
+          output-format: cli
+      - name: Run Checkov on Kubernetes Manifests
+        uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: k8s/
+          framework: kubernetes
+          soft-fail: true
+          output-format: cli
+          
+  Dockerfile-lint:
+    name: "Dockerfile Lint"
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        component: [backend, frontend]
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      - name: Run Hadolint
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: ${{ matrix.component }}/Dockerfile
+          failure-threshold: warning
+        
+  Update-manifest:
+    name: "Update k8s Manifests."
+    runs-on: ubuntu-latest
+    needs: [Build, image-scan, iac-scan, Dockerfile-lint]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions: 
+      contents: write
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Get short sha
+        id: sha
+        run: echo "short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+      - name: Update k8s manifests with new image tags
+        run: |
+          IMAGE_TAG=${{ steps.sha.outputs.short }}
+          # update backend image
+          sed -i "s|image: .*jerney-backend.*|image: ${BACKEND_IMAGE}:${IMAGE_TAG}|g " k8s/jerney.yaml
+          sed -i "s|image: BACKEND_IMAGE_PLACEHOLDER|image: ${BACKEND_IMAGE}:${IMAGE_TAG}|g" k8s/jerney.yaml
+          # update frontend image
+          sed -i "s|image: .*jerney-frontend.*|image: ${FRONTEND_IMAGE}:${IMAGE_TAG}|g" k8s/jerney.yaml
+          sed -i "s|image: FRONTEND_IMAGE_PLACEHOLDER|image: ${FRONTEND_IMAGE}:${IMAGE_TAG}|g" k8s/jerney.yaml
+          echo "Updated image to tag ${IMAGE_TAG}"
+          grep "image:" k8s/jerney.yaml
+      - name: Commit and Push mainifest updated
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add k8s/jerney.yaml
+          git diff --cached --quiet || git commit -m "ci: update k8s image to ${{ steps.sha.outputs.short }} [skip ci]"
+          git push
+          
+          
+        
+          
+          
+    
+    
+    
+    
+        
+        
+    
+          
+        
+            
+    
+  
+          
           
           
           
