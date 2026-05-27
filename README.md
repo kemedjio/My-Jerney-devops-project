@@ -10,7 +10,6 @@ A Gen-Z vibe blog platform built with a 3-tier architecture — React frontend, 
 
 > [!IMPORTANT]
 > **Looking for the full DevSecOps implementation?**
-> Switch to the [`devops`](../../tree/devops) branch for Docker, Kubernetes (EKS Auto Mode), Terraform, CI/CD with GitHub Actions, container security scanning, and more.
 >
 > ```bash
 > git checkout devops
@@ -40,7 +39,7 @@ A Gen-Z vibe blog platform built with a 3-tier architecture — React frontend, 
 ## 📁 Project Structure
 
 ```
-Jerney/
+My-Jerney-devops-project/
 ├── frontend/                # React (Vite) frontend
 │   ├── src/                 # React components & pages
 │   ├── nginx.conf           # Nginx config for serving the app
@@ -51,7 +50,7 @@ Jerney/
 ├── deploy/                  # EC2 deployment scripts
 │   ├── setup.sh             # One-click EC2 setup script
 │   └── jerney-nginx.conf    # Nginx reverse proxy config
-└── README.md
+└── 
 ```
 
 ---
@@ -215,6 +214,211 @@ helm install argo-cd argo/argo-cd -n argocd -f argocd-values-9.4.0.yaml --versio
 mkdir -p .github/workflows
 ```
 Inside the `workflows,` create two config files.
+CI.yaml
+sim-security-scan.yml
+
+## Create our Argocd App
+
+Create the Argo app manifest and place it inside the `argocd/` directory.
+
+Now apply the file:
+
+```bash
+kubectl apply -f boutique-app.yaml
+```
+
+Check the ArgoCD UI; you should see the app visible there. And all Synced.
+
+# Observability
+
+We  dont manage the observability stack by Argocd. Because anyone having access to Argocd can modify it.
+
+## 1. Monitoring
+
+Create a namespace:
+
+```bash
+kubectl create ns monitoring
+```
+
+## Setup Slack
+
+Create a dedicated channel where you want to receive the alerts.
+
+**`#alertmanager`**
+
+Keep it public.
+
+![image.png](docs/images/image%2010.png)
+
+After this is done 
+
+Give name and choose the workspace and create.
+
+
+Head to **`Incoming Webhook`**
+
+Turn it ON
+
+Scroll down then Click on **`Add New Webhook`**
+
+Select the channel and then allow.
+
+Copy the Webhook and keep it somewhere pasted.
+
+### Create a Kubernetes Secret for Slack Webhook
+
+On your cluster:
+
+```bash
+kubectl create secret generic alertmanager-slack-webhook \
+  --from-literal=slack-webhook-url="<Webhook FQDN>" \
+  -n monitoring
+```
+
+Verify:
+
+```bash
+kubectl get secret alertmanager-slack-webhook -n monitoring
+```
+
+### Kube-Prometheus-Stack
+
+Add `kube-prometheus-stack`  repo:
+
+```bash
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+```
+
+get the helm values and save it in a file:
+
+```bash
+helm show values prometheus-community/kube-prometheus-stack --version 81.6.3 > observability/helm-values/kube-prom-stack-81.6.3.yaml 
+```
+
+Edit in `vi`
+
+Attach the secret in `alertmanagerSpec:` section. So that it will mount to the pod.
+
+```bash
+alertmanager:
+  alertmanagerSpec:
+        secrets:
+            - alertmanager-slack-webhook
+```
+
+Go to `alertmanger` section and find its `config` block:
+
+```bash
+config:
+    global:
+      resolve_timeout: 5m
+    route:
+      group_by: ['namespace']
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 12h
+      receiver: 'slack-notification'
+      routes:
+      - receiver: 'slack-notification'
+        matchers:
+          - severity = "critical"
+    receivers:
+    - name: 'slack-notification'
+      slack_configs:
+          - api_url_file: /etc/alertmanager/secrets/alertmanager-slack-webhook/slack-webhook-url
+           channel: '#alerts'
+           send_resolved: true
+    templates:
+    - '/etc/alertmanager/config/*.tmpl'
+```
+
+>### Slack Config
+>
+>```yaml
+>api_url:'https://hooks.slack.com/services/...'channel:'#alerts'send_resolved:true
+>```
+>
+># 5. Templates
+>
+>```yaml
+>templates:-'/etc/alertmanager/config/*.tmpl'
+>```
+
+>---
+>
+># How It Actually Works (End-to-End Flow)
+>
+>### 1. Application exposes metrics
+>
+>Example:
+>
+>```
+>http_requests_total
+>pod_memory_usage_bytes
+>up
+>```
+>---
+>
+>### 2. Prometheus scrapes those metrics
+>
+>From:
+>
+>- Pods
+>- Services
+>- Nodes
+>- Kubernetes API
+>- etc.
+>
+>---
+>
+>### 3. Alert Rules Define When Something Is Critical
+>
+>Inside kube-prometheus-stack, there are many alert rules like:
+>
+>```yaml
+>-alert:PodCrashLoopingexpr:kube_pod_container_status_restarts_total>5for:5mlabels:severity:criticalannotations:description:Podisrestartingfrequently
+>```
+
+>
+>### 4. Prometheus Sends Alert to Alertmanager
+>
+>When the condition becomes true:
+>
+>```json
+>{"alertname":"PodCrashLooping","severity":"critical","namespace":"production"}
+>```
+>
+>Prometheus pushes this to Alertmanager.
+>
+>---
+>
+>### 5. Alertmanager Routes Based on Labels
+>
+>Now your config says:
+>
+>```yaml
+>matchers:-severity="critical"
+>```
+>
+
+Install Prometheus:
+
+```bash
+helm upgrade -i kube-prometheus-stack prometheus-community/kube-prometheus-stack --version 81.6.3 -f helm-values/kube-prom-stack-81.6.3.yaml -n monitoring
+```
+
+Check if all the pods are running:
+
+```bash
+kubectl get po -n monitoring
+```
+
+Check the Services:
+
+```bash
+kubectl get svc -n monitoring
+
 
 ```| Branch | Purpose |
 |--------|---------|
@@ -223,4 +427,3 @@ Inside the `workflows,` create two config files.
 
 ---
 
-Built with 💜 by the Jerney team. No cap, this blog platform hits different. 🛤️
