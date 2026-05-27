@@ -50,7 +50,7 @@ jobs:
           cache-dependency-path: "${{ matrix.component }}/package-lock.json"
       - name: Install dependency
         working-directory: ${{ matrix.component }}
-        run: npm ci
+        run: npm ci --legacy-peer-deps
       - name: NPM audit
         working-directory: ${{ matrix.component }}
         run: npm audit --audit-level=high || true
