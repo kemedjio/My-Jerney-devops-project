@@ -1,4 +1,4 @@
-# Generate a key and registers it in AWS.
+# Generate a key and register it in AWS.
 
 resource "tls_private_key" "bastion_key" {
   algorithm = "RSA"
@@ -6,7 +6,7 @@ resource "tls_private_key" "bastion_key" {
 }
 
 resource "aws_key_pair" "bastion_keypair" {
-  key_name   = "bastion-ecommerce-key"
+  key_name   = "bastion-key"
   public_key = tls_private_key.bastion_key.public_key_openssh
 }
 
@@ -15,14 +15,14 @@ resource "aws_key_pair" "bastion_keypair" {
 
 resource "local_file" "bastion_private_key" {
   content         = tls_private_key.bastion_key.private_key_pem
-  filename        = "bastion-ecommerce-key.pem"
+  filename        = "bastion-key.pem"
   file_permission = "0400"
 }
 
 # Security Group for Bastion
 
 resource "aws_security_group" "bastion_sg" {
-  name   = "bastion-ecommerce-sg"
+  name   = "bastion-sg"
   vpc_id = module.vpc.vpc_id
 
   ingress {
