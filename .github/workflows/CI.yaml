@@ -141,7 +141,7 @@ jobs:
         uses: bridgecrewio/checkov-action@v12
         with:
           directory: k8s/
-          framework: kubernetes
+          framework: Kubernetes
           soft-fail: true
           output-format: cli
           
