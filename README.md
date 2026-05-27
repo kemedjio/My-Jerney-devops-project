@@ -56,101 +56,6 @@ Jerney/
 
 ---
 
-## 🚀 Deploy on AWS EC2
-
-### Prerequisites
-
-- An AWS EC2 instance running **Ubuntu 22.04+**
-- Security Group allowing inbound traffic on ports **22** (SSH) and **80** (HTTP)
-- SSH access to the instance
-
-### Step 1: Transfer the Code to EC2
-
-```bash
-# From your local machine
-scp -r -i your-key.pem ./Jerney ubuntu@<EC2_PUBLIC_IP>:~/Jerney
-```
-
-### Step 2: SSH into the Instance
-
-```bash
-ssh -i your-key.pem ubuntu@<EC2_PUBLIC_IP>
-```
-
-### Step 3: Run the Setup Script
-
-The `deploy/setup.sh` script installs everything and configures the app automatically:
-
-```bash
-cd ~/Jerney
-chmod +x deploy/setup.sh
-./deploy/setup.sh
-```
-
-This script will:
-1. Update system packages
-2. Install **Node.js 20.x**, **PostgreSQL 16**, **Nginx**, and **PM2**
-3. Create the database and user
-4. Install backend dependencies
-5. Build the React frontend
-6. Configure Nginx as a reverse proxy
-7. Start the backend with PM2 (auto-restarts on crash/reboot)
-
-### Step 4: Access the App
-
-Open your browser and go to:
-
-```
-http://<EC2_PUBLIC_IP>
-```
-
-### Useful Commands
-
-```bash
-pm2 status                          # Check backend status
-pm2 logs                            # View backend logs
-pm2 restart all                     # Restart backend
-sudo systemctl restart nginx        # Restart Nginx
-sudo -u postgres psql -d jerney_db  # Connect to database
-```
-
----
-
-## 🧑‍💻 Local Development (Without Docker)
-
-### Prerequisites
-
-- Node.js 20+
-- PostgreSQL 16+
-
-### Backend
-
-```bash
-cd backend
-npm install
-
-# Create a .env file (or export these variables)
-export DB_HOST=localhost
-export DB_PORT=5432
-export DB_USER=jerney_user
-export DB_PASSWORD=jerney_pass_2026
-export DB_NAME=jerney_db
-export PORT=5000
-
-npm start
-```
-
-### Frontend
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-The Vite dev server starts on `http://localhost:3000` and proxies `/api` requests to the backend at `http://localhost:5000`.
-
----
 
 ## 📡 API Endpoints
 
@@ -167,10 +72,151 @@ The Vite dev server starts on `http://localhost:3000` and proxies `/api` request
 | DELETE | `/api/comments/:id` | Delete a comment |
 
 ---
+## Install tools in Local Machine
 
+- AWS CLI
+- Terraform on your local machine
+- Create an IAM user and create an access key and secret access key for the user, and do `aws configure.`
+
+## Terraform Run to create the infrastructure
+
+Clone the repo, `cd` to the `terraform` directory. 
+
+```bash
+terraform init
+Terraform plan 
+terraform apply
+```
+## Bastion Host Configuration
+
+SSH to bastion and  install the following tools:
+
+- AWS CLI
+- kubectl client
+- HELM
+- eksctl
+
+# update the kube config file and check
+aws eks update-kubeconfig --region <your-region> --name <your-cluster-name> 
+
+kubectl get nodes
+
+# Install the AWS load balancer controller
+
+Create an IAM OIDC provider. 
+
+```
+eksctl utils associate-iam-oidc-provider \
+    --region us-east-1 \
+    --cluster ecommerce-cluster \
+    --approve
+```
+
+**Create IAM role using `eksctl`.**
+
+1. Download an IAM policy for the AWS Load Balancer Controller 
+    ```bash
+    curl -O https://raw.githubusercontent.com/kubernetes-sigs/aws-load-balancer-controller/v2.14.1/docs/install/iam_policy.json
+    ```
+    
+2. Create an IAM policy using the policy downloaded in the previous step.
+    
+    ```bash
+    aws iam create-policy \
+        --policy-name AWSLoadBalancerControllerIAMPolicy \
+        --policy-document file://iam_policy.json
+    ```
+    
+3. Replace the values for cluster name, region code, and account ID.
+    
+    ```bash
+    eksctl create iamserviceaccount \
+        --cluster=jerney-cluster \
+        --namespace=kube-system \
+        --name=aws-load-balancer-controller \
+        --attach-policy-arn=arn:aws:iam::<AWS_ACCOUNT_ID>:policy/AWSLoadBalancerControllerIAMPolicy \
+        --override-existing-serviceaccounts \
+        --region us-east-1 \
+        --approve
+    ```
+    
+
+**Install AWS Load Balancer Controller**
+
+1. Add the `eks-charts` Helm chart repository. 
+    ```bash
+    helm repo add eks https://aws.github.io/eks-charts
+    ```
+    
+
+        helm upgrade -i aws-load-balancer-controller eks/aws-load-balancer-controller \
+          -n kube-system \
+          --set clusterName=jerney-cluster \
+          --set region=us-east-1 \
+          --set vpcId=vpc-043ed20a9ec883107 \
+          --set serviceAccount.create=false \
+          --set serviceAccount.name=aws-load-balancer-controller \
+          --set controllerConfig.featureGates.NLBGatewayAPI=true \
+          --set controllerConfig.featureGates.ALBGatewayAPI=true \
+          --version 3.0.0
+        ```
+        
+
+**Verify that the controller is installed**
+
+    
+    ```bash
+    kubectl get deployment -n kube-system aws-load-balancer-controller
+    ```## Set up Terraform Remote Backend (Optional)
+
+Create a bucket using Console or AWS CLI.
+
+```bash
+aws s3api create-bucket \
+  --bucket ecommerce-terraform-backend-bucket234 \
+  --region us-east-1
 ## 🌿 Branch Strategy
 
-| Branch | Purpose |
+
+## Deploy ArgoCD
+
+
+**Add ArgoCD repo**
+
+```bash
+helm repo add argo https://argoproj.github.io/argo-helm
+```
+
+Get the values:
+
+```bash
+helm show values argo/argo-cd --version 9.4.0 > argocd-values-9.4.0.yaml
+```
+
+Modify the values file:
+
+Add  ”`server.insecure: true`”  line explicitly :
+
+Add this `kustomize.buildOptions: "--enable-helm` line in the `config` section as Kustomize requires to combine the helm values and manifest file.
+
+- Helm support inside Kustomize is considered an **unsafe plugin**, so it is disabled.
+- You must explicitly allow it.
+
+    kustomize.buildOptions: "--enable-helm"
+
+
+Install the chart:
+
+```bash
+helm install argo-cd argo/argo-cd -n argocd -f argocd-values-9.4.0.yaml --version 9.4.0 --create-namespace
+##  set up the CI part in GitHub Actions.
+
+```bash
+mkdir -p .github/workflows
+```
+Inside the `workflows,` create two config files.
+
+```| Branch | Purpose |
 |--------|---------|
 | `main` | Source code + EC2 bare-metal deployment |
 | `devops` | Full DevSecOps — Docker, Kubernetes (EKS), Terraform, CI/CD pipeline, security scanning |
