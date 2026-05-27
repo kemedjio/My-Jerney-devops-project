@@ -1,7 +1,7 @@
 data "http" "my_ip" {
   url = "https://checkip.amazonaws.com"
 }
-
+# retieve ami
 data "aws_ami" "ubuntu" {
   most_recent = true
 
