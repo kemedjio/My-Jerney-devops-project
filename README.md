@@ -8,13 +8,6 @@ A Gen-Z vibe blog platform built with a 3-tier architecture — React frontend, 
 
 ---
 
-> [!IMPORTANT]
-> **Looking for the full DevSecOps implementation?**
->
-> ```bash
-> git checkout devops
-> ```
-
 ---
 
 ## ✨ Features
@@ -50,7 +43,19 @@ My-Jerney-devops-project/
 ├── deploy/                  # EC2 deployment scripts
 │   ├── setup.sh             # One-click EC2 setup script
 │   └── jerney-nginx.conf    # Nginx reverse proxy config
-└── 
+└── terraform/
+│   ├── bastion-ec2.tf      # Bastion host
+│   ├── data.tf             # retrieve ubuntu AMI
+│   ├── eks.tf              # AWS EKS cluster module configuration
+│   ├── outputs.tf          # Output bastion public IP, cluster name, vpc id
+│   ├── terraform.tf        # terraform provider config
+│   ├── terraform.tf        # terraform provider config
+│   ├── vpc.tf              # AWS VPC module for the infra
+└── argocd
+│   ├── jerney-app.yaml     # jerney argocd application file
+│
+└── k8s
+    ├── jerney.yaml         # jerney kubernetes manifest
 ```
 
 ---
