@@ -8,13 +8,6 @@ A Gen-Z vibe blog platform built with a 3-tier architecture — React frontend, 
 
 ---
 
-> [!IMPORTANT]
-> **Looking for the full DevSecOps implementation?**
->
-> ```bash
-> git checkout devops
-> ```
-
 ---
 
 ## ✨ Features
@@ -50,7 +43,19 @@ My-Jerney-devops-project/
 ├── deploy/                  # EC2 deployment scripts
 │   ├── setup.sh             # One-click EC2 setup script
 │   └── jerney-nginx.conf    # Nginx reverse proxy config
-└── 
+└── terraform/
+│   ├── bastion-ec2.tf      # Bastion host
+│   ├── data.tf             # retrieve ubuntu AMI
+│   ├── eks.tf              # AWS EKS cluster module configuration
+│   ├── outputs.tf          # Output bastion public IP, cluster name, vpc id
+│   ├── terraform.tf        # terraform provider config
+│   ├── terraform.tf        # terraform provider config
+│   ├── vpc.tf              # AWS VPC module for the infra
+└── argocd
+│   ├── jerney-app.yaml     # jerney argocd application file
+│
+└── k8s
+    ├── jerney.yaml         # jerney kubernetes manifest
 ```
 
 ---
@@ -231,7 +236,7 @@ Check the ArgoCD UI; you should see the app visible there. And all Synced.
 
 # Observability
 
-We  dont manage the observability stack by Argocd. Because anyone having access to Argocd can modify it.
+We  don't manage the observability stack with ArgoCD. Because anyone having access to Argocd can modify it.
 
 ## 1. Monitoring
 
@@ -246,10 +251,6 @@ kubectl create ns monitoring
 Create a dedicated channel where you want to receive the alerts.
 
 **`#alertmanager`**
-
-Keep it public.
-
-![image.png](docs/images/image%2010.png)
 
 After this is done 
 
@@ -420,10 +421,4 @@ Check the Services:
 kubectl get svc -n monitoring
 
 
-```| Branch | Purpose |
-|--------|---------|
-| `main` | Source code + EC2 bare-metal deployment |
-| `devops` | Full DevSecOps — Docker, Kubernetes (EKS), Terraform, CI/CD pipeline, security scanning |
-
----
 

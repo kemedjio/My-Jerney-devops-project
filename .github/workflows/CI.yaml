@@ -28,7 +28,7 @@ jobs:
           cache-dependency-path: "${{ matrix.component }}/package-lock.json"
       - name: Install Dependency
         working-directory: ${{ matrix.component }}
-        run: npm ci
+        run: npm ci --legacy-peer-deps 
       - name: Run ESlint
         working-directory: ${{ matrix.component }}
         run: npm run lint

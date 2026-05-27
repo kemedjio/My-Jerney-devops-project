@@ -26,7 +26,7 @@ module "eks" {
   source  = "terraform-aws-modules/eks/aws"
   version = "~> 21.0"
 
-  name               = "ecommerce-cluster"
+  name               = "jerney-cluster"
   kubernetes_version = "1.34"
 
   addons = {
@@ -53,7 +53,7 @@ module "eks" {
 
   eks_managed_node_groups = {
     example = {
-      # Starting on 1.30, AL2023 is the default AMI type for EKS managed node groups
+      # Starting on 1.30, AL2023 is the default AMI type for EKS-managed node groups
       ami_type       = "AL2023_x86_64_STANDARD"
       instance_types = ["c7i-flex.large"]
 
