@@ -236,7 +236,7 @@ Check the ArgoCD UI; you should see the app visible there. And all Synced.
 
 # Observability
 
-We  dont manage the observability stack by Argocd. Because anyone having access to Argocd can modify it.
+We  don't manage the observability stack with ArgoCD. Because anyone having access to Argocd can modify it.
 
 ## 1. Monitoring
 
@@ -251,10 +251,6 @@ kubectl create ns monitoring
 Create a dedicated channel where you want to receive the alerts.
 
 **`#alertmanager`**
-
-Keep it public.
-
-![image.png](docs/images/image%2010.png)
 
 After this is done 
 
