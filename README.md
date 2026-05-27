@@ -421,10 +421,4 @@ Check the Services:
 kubectl get svc -n monitoring
 
 
-```| Branch | Purpose |
-|--------|---------|
-| `main` | Source code + EC2 bare-metal deployment |
-| `devops` | Full DevSecOps — Docker, Kubernetes (EKS), Terraform, CI/CD pipeline, security scanning |
-
----
 
