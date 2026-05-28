@@ -59,7 +59,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: sca
     permissions: 
-      contents: read
+      contents: write
       packages: write
     strategy:
       matrix:
