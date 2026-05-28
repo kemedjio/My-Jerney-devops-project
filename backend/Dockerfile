@@ -1,5 +1,5 @@
 #----------Build stage---------#
-FROM node:20-alpine AS Build
+FROM node:20-alpine AS build
 
 WORKDIR /app
 
@@ -8,7 +8,7 @@ COPY package.json package-lock.json* ./
 RUN npm ci --only=production && npm cache clean --force
 
 #------------Final stage----------------#
-FROM node:20-alpine AS Production
+FROM node:20-alpine AS production
 
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 
@@ -16,7 +16,7 @@ RUN apk --no-cache add dumb-init
 
 WORKDIR /app
 
-COPY --from=Build /app/node_modules ./node_modules 
+COPY --from=build /app/node_modules ./node_modules 
 COPY src/ ./src/ 
 
 USER appuser
